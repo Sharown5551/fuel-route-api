@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Fuel Route Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #summary { padding: 10px 16px; background: #1f2937; color: #fff; }
+    #map { height: calc(100vh - 60px); }
+  </style>
+</head>
+<body>
+  {% if error %}
+    <div id="summary">Error: {{ error }}</div>
+  {% else %}
+    <div id="summary">
+      <b>{{ trip.start.query }}</b> to <b>{{ trip.finish.query }}</b> |
+      {{ trip.distance_miles }} miles | {{ trip.fuel_stops|length }} fuel stops |
+      Total fuel cost: <b>${{ trip.total_fuel_cost }}</b>
+    </div>
+    <div id="map"></div>
+    {{ trip|json_script:"trip-data" }}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      const trip = JSON.parse(document.getElementById("trip-data").textContent);
+      const map = L.map("map");
+      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+        attribution: "Tiles &copy; Esri",
+        maxZoom: 18
+      }).addTo(map);
+
+      const line = L.geoJSON(trip.route, { style: { color: "#2563eb", weight: 5 } }).addTo(map);
+      map.fitBounds(line.getBounds());
+
+      L.marker([trip.start.latitude, trip.start.longitude]).addTo(map).bindPopup("Start: " + trip.start.query);
+      L.marker([trip.finish.latitude, trip.finish.longitude]).addTo(map).bindPopup("Finish: " + trip.finish.query);
+
+      trip.fuel_stops.forEach((s, i) => {
+        L.circleMarker([s.latitude, s.longitude], { radius: 9, color: "#dc2626", fillOpacity: 0.9 })
+          .addTo(map)
+          .bindPopup(`<b>Stop ${i + 1}: ${s.name}</b><br>${s.city}, ${s.state}<br>
+                      Mile ${s.route_mile}<br>$${s.price_per_gallon}/gal x ${s.gallons} gal = $${s.cost}`);
+      });
+    </script>
+  {% endif %}
+</body>
+</html>
